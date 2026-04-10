@@ -3,6 +3,7 @@ name = "pitchiq"
 version = "0.1.0"
 description = "Football match outcome prediction engine"
 authors = ["PitchIQ Team"]
+package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.11"
