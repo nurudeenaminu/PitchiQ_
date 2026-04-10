@@ -1,0 +1,18 @@
+sources:
+  football_data:
+    enabled: true
+    base_url: "https://www.football-data.co.uk/mmz4281"
+    leagues:
+      EPL: { code: "E0", seasons: ["2122","2223","2324"] }
+  understat:
+    enabled: true
+    leagues: ["EPL", "La liga", "Bundesliga", "Serie A", "Ligue 1"]
+    seasons: ["2021", "2022", "2023"]
+  fbref:
+    enabled: true
+    leagues: ["ENG-Premier League", "ESP-La Liga"]
+    seasons: ["2022-2023", "2023-2024"]
+  api_football:
+    enabled: true
+    leagues:
+      EPL: { id: 39, season: 2023 }

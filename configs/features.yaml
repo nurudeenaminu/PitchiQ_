@@ -1,0 +1,44 @@
+version: "v1"
+rolling_windows:
+  short: 5
+  long: 10
+  venue_split: true
+
+seasons:
+  current: "2425"  # 2024/25 season
+  previous: "2324" # 2023/24 season
+  training_seasons:
+    - "2324"
+    - "2223"
+    - "2122"
+
+features:
+  form:
+    - rolling_wins_{w}
+    - rolling_goals_scored_{w}
+    - rolling_goals_conceded_{w}
+    - rolling_xg_for_{w}
+    - rolling_xg_against_{w}
+    - rolling_points_{w}
+    - rolling_clean_sheets_{w}
+  head_to_head:
+    columns:
+      - h2h_home_win_rate
+      - h2h_avg_goals
+      - h2h_last_result
+    max_meetings: 5
+  contextual:
+    - rest_days_home
+    - rest_days_away
+    - matchweek
+    - league_position_diff
+    - is_home
+    - is_derby
+    - promoted_team_home
+    - promoted_team_away
+
+quality:
+  vif_threshold: 10
+  min_null_rate_drop: 0.4
+  corr_threshold: 0.95
+

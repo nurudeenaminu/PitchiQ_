@@ -1,0 +1,139 @@
+name: Train & Evaluate
+
+on:
+  # Run manually from the Actions tab
+  workflow_dispatch:
+    inputs:
+      val_frac:
+        description: "Temporal holdout fraction (0.1 – 0.3)"
+        required: false
+        default: "0.2"
+      train_baselines:
+        description: "Also train baseline LR/XGB/LGBM models?"
+        required: false
+        default: "false"
+        type: boolean
+
+  # Run automatically every Monday at 02:00 UTC (weekly retrain)
+  schedule:
+    - cron: "0 2 * * 1"
+
+  # Also trigger when the feature store changes
+  push:
+    paths:
+      - "src/training/**"
+      - "src/features/**"
+      - "configs/model.yaml"
+      - "configs/features.yaml"
+
+jobs:
+  train:
+    name: Train + MLflow
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Cache Poetry virtualenv
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ hashFiles('pyproject.toml') }}
+
+      - name: Install dependencies
+        run: poetry install --no-interaction
+
+      # ── Data & Features ───────────────────────────────────────────────────
+      - name: Ingest data
+        env:
+          RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
+          ENABLE_MLFLOW: "0"
+        run: poetry run python -m src.ingestion.run_ingestion
+
+      - name: Build feature store
+        env:
+          ENABLE_MLFLOW: "0"
+        run: poetry run python -m src.features.build_features
+
+      # ── Train with MLflow tracking ─────────────────────────────────────────
+      - name: Train model
+        env:
+          ENABLE_MLFLOW: "1"
+          MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI || 'mlruns' }}
+          MLFLOW_EXPERIMENT_NAME: "pitchiq_training"
+          MLFLOW_TRACKING_USERNAME: ${{ secrets.MLFLOW_TRACKING_USERNAME }}
+          MLFLOW_TRACKING_PASSWORD: ${{ secrets.MLFLOW_TRACKING_PASSWORD }}
+          PITCHIQ_TRAIN_BASELINES: ${{ inputs.train_baselines == 'true' && '1' || '0' }}
+        run: |
+          poetry run python -m src.training.train \
+            --val-frac ${{ inputs.val_frac || '0.2' }}
+
+      # ── Evaluate ──────────────────────────────────────────────────────────
+      - name: Evaluate model
+        env:
+          ENABLE_MLFLOW: "1"
+          MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI || 'mlruns' }}
+          MLFLOW_EXPERIMENT_NAME: "pitchiq_evaluation"
+          MLFLOW_TRACKING_USERNAME: ${{ secrets.MLFLOW_TRACKING_USERNAME }}
+          MLFLOW_TRACKING_PASSWORD: ${{ secrets.MLFLOW_TRACKING_PASSWORD }}
+        run: poetry run python -m src.evaluation.evaluate
+
+      # ── Upload artefacts ──────────────────────────────────────────────────
+      - name: Upload model artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ensemble-model-${{ github.run_number }}
+          path: models/ensemble_v1.pkl
+          retention-days: 30
+
+      - name: Upload evaluation reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: evaluation-reports-${{ github.run_number }}
+          path: |
+            reports/evaluation_metrics.json
+            reports/training_metrics.json
+            reports/calibration_data.json
+            reports/features_metrics.json
+          retention-days: 30
+
+      # ── Print key metrics to the Actions summary ──────────────────────────
+      - name: Print metrics summary
+        if: always()
+        run: |
+          python3 - << 'PYEOF'
+          import json, pathlib, os
+          p = pathlib.Path("reports/evaluation_metrics.json")
+          if p.exists():
+              m = json.loads(p.read_text())
+              summary = f"""
+          ## PitchIQ Evaluation — Run {os.environ.get('GITHUB_RUN_NUMBER','?')}
+
+          | Metric | Value |
+          |--------|-------|
+          | Log Loss | {m.get('log_loss', 'n/a'):.4f} |
+          | Macro F1 | {m.get('macro_f1', 'n/a'):.4f} |
+          | Accuracy | {m.get('accuracy', 'n/a'):.4f} |
+          | Test rows | {m.get('n_test_rows', 'n/a')} |
+          | Train rows | {m.get('n_train_rows', 'n/a')} |
+          """
+              ghs = os.environ.get("GITHUB_STEP_SUMMARY")
+              if ghs:
+                  open(ghs, "a").write(summary)
+              print(summary)
+          else:
+              print("evaluation_metrics.json not found")
+          PYEOF

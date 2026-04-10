@@ -1,0 +1,17 @@
+# Enforce LF line endings for all text files
+* text=auto eol=lf
+*.py text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.toml text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.json text eol=lf
+Makefile text eol=lf
+
+# Binary files - no line ending conversion
+*.pkl binary
+*.parquet binary
+*.duckdb binary
+*.png binary
+*.db binary
