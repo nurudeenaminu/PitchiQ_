@@ -11,11 +11,15 @@ else
 	PYTHON = python3
 endif
 
-.PHONY: install data features train eval serve-api serve-ui test lint all docker-up docker-down clean
+.PHONY: install install-ml data features train eval serve-api serve-ui test lint all docker-up docker-down clean
 
 ## ── Setup ────────────────────────────────────────────────────────────────────
 install:
-	poetry install
+	poetry install --no-root
+	pre-commit install
+
+install-ml:
+	poetry install --no-root --extras ml
 	pre-commit install
 
 ## ── Pipeline ─────────────────────────────────────────────────────────────────

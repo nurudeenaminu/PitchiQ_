@@ -92,10 +92,16 @@ git clone <your-repo-url>
 cd PitchIQ_
 
 # Install dependencies
-poetry install
+poetry install --no-root
 
 # Optional: install git hooks
 pre-commit install
+```
+
+If you want the full training and evaluation stack, install the optional ML extra:
+
+```bash
+poetry install --no-root --extras ml
 ```
 
 ## Environment Variables

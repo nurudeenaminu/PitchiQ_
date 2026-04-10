@@ -3,10 +3,15 @@ import numpy as np
 from pathlib import Path
 from contextlib import nullcontext
 from sklearn.linear_model import LogisticRegression
-from xgboost import XGBClassifier
-from lightgbm import LGBMClassifier
 from sklearn.metrics import log_loss, f1_score, accuracy_score
 from typing import Tuple
+
+try:
+    from xgboost import XGBClassifier  # type: ignore
+    from lightgbm import LGBMClassifier  # type: ignore
+except Exception:  # pragma: no cover
+    XGBClassifier = None  # type: ignore
+    LGBMClassifier = None  # type: ignore
 
 try:
     import mlflow  # type: ignore
@@ -18,6 +23,13 @@ except Exception:  # pragma: no cover
 from src.features.columns import FEATURE_COLUMNS, TARGET_MAP
 import argparse
 import os
+
+
+def _require_ml_extras() -> None:
+    if XGBClassifier is None or LGBMClassifier is None:
+        raise RuntimeError(
+            "PitchIQ training requires the optional 'ml' extra. Install it with 'poetry install --extras ml'."
+        )
 
 
 def _mlflow_enabled() -> bool:
@@ -96,6 +108,7 @@ def _temporal_split(
 
 
 def train_base_models(X, y):
+    _require_ml_extras()
     # Simple training without Optuna for now
     lr = LogisticRegression(C=0.1, max_iter=1000, random_state=42)
     lr.fit(X, y)
@@ -150,6 +163,7 @@ def _parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = _parse_args()
+    _require_ml_extras()
 
     run_ctx = nullcontext()
     if _mlflow_enabled():

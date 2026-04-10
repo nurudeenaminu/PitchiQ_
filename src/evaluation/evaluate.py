@@ -6,11 +6,22 @@ from sklearn.metrics import log_loss, f1_score, roc_auc_score, brier_score_loss,
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-import shap
 import joblib
 from sklearn.calibration import calibration_curve
 
+try:
+    import shap  # type: ignore
+except Exception:  # pragma: no cover
+    shap = None  # type: ignore
+
 from src.features.columns import FEATURE_COLUMNS, TARGET_MAP
+
+
+def _require_ml_extras() -> None:
+    if shap is None:
+        raise RuntimeError(
+            "PitchIQ evaluation requires the optional 'ml' extra. Install it with 'poetry install --extras ml'."
+        )
 
 
 def _normalize_proba(y_pred_proba: np.ndarray) -> np.ndarray:
@@ -146,6 +157,10 @@ def plot_calibration(y_true, y_pred_proba, class_names=['Away', 'Draw', 'Home'])
 
 
 def shap_analysis(model, X_test, features):
+    if shap is None:
+        print("SHAP is not installed; skipping SHAP analysis. Install the optional 'ml' extra to enable it.")
+        return
+
     Path('reports').mkdir(exist_ok=True)
     # Handle both stacking and direct XGBoost models
     if hasattr(model, 'estimators_') and len(model.estimators_) > 1:
